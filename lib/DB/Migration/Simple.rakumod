@@ -11,7 +11,7 @@ class DB::Migration::Simple {
     method current-version() {
         try {
             my $sth = $!dbh.prepare(qq:to/END-STATEMENT/);
-                SELECT value FROM $!migration-table-name
+                SELECT value FROM $!dbh.quote($!migration-table-name, :as-id)
                     WHERE $!keycolumn = 'current-version'
             END-STATEMENT
             $sth.execute();
@@ -70,7 +70,7 @@ class DB::Migration::Simple {
             }
         }
         $!dbh.do(qq:to/END-STATEMENT/);
-            UPDATE $!migration-table-name
+            UPDATE $!dbh.quote($!migration-table-name, :as-id)
                 SET value = '$target-version'
                 WHERE $!keycolumn = 'current-version'
         END-STATEMENT
@@ -112,7 +112,7 @@ class DB::Migration::Simple {
     method !init-meta-table() {
         self!debug("initializing $!migration-table-name");
         my $query = qq:to/END-STATEMENT/;
-            CREATE TABLE IF NOT EXISTS $!migration-table-name (
+            CREATE TABLE IF NOT EXISTS $!dbh.quote($!migration-table-name, :as-id) (
                 $!keycolumn     TEXT UNIQUE NOT NULL,
                 value   INTEGER NOT NULL CHECK (value >= 0)
             )
@@ -121,7 +121,7 @@ class DB::Migration::Simple {
         $!dbh.do($query);
 
         $!dbh.do(qq:to/END-STATEMENT/);
-            INSERT INTO $!migration-table-name
+            INSERT INTO $!dbh.quote($!migration-table-name, :as-id)
                 VALUES ('current-version', 0)
         END-STATEMENT
         self!debug("set initial version to 0");
