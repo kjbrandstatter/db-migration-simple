@@ -5,13 +5,14 @@ class DB::Migration::Simple {
     has $.dbh is required;
     has $.migration-file is required;
     has $.migration-table-name = 'db-migrations-simple-meta';
+    has $.keycolumn = "key";
     has %!cfg = self!read-config();
 
     method current-version() {
         try {
             my $sth = $!dbh.prepare(qq:to/END-STATEMENT/);
-                SELECT value FROM "$!migration-table-name"
-                    WHERE key = 'current-version'
+                SELECT value FROM $!migration-table-name
+                    WHERE $!keycolumn = 'current-version'
             END-STATEMENT
             $sth.execute();
             my @rows = $sth.allrows();
@@ -41,7 +42,7 @@ class DB::Migration::Simple {
 
         self!debug("$!verbose migrating '$direction' from version '$current-version' to version '$target-version'");
 
-        $!dbh.do('BEGIN TRANSACTION');
+        $!dbh.do('BEGIN');
 
         my @versions = $direction eq 'up'
             ?? ($current-version + 1 ... $target-version)
@@ -69,9 +70,9 @@ class DB::Migration::Simple {
             }
         }
         $!dbh.do(qq:to/END-STATEMENT/);
-            UPDATE "$!migration-table-name"
+            UPDATE $!migration-table-name
                 SET value = '$target-version'
-                WHERE key = 'current-version'
+                WHERE $!keycolumn = 'current-version'
         END-STATEMENT
         $!dbh.do('COMMIT');
         return $target-version;
@@ -110,15 +111,17 @@ class DB::Migration::Simple {
 
     method !init-meta-table() {
         self!debug("initializing $!migration-table-name");
-        $!dbh.do(qq:to/END-STATEMENT/);
-            CREATE TABLE IF NOT EXISTS "$!migration-table-name" (
-                key     TEXT UNIQUE NOT NULL,
+        my $query = qq:to/END-STATEMENT/;
+            CREATE TABLE IF NOT EXISTS $!migration-table-name (
+                $!keycolumn     TEXT UNIQUE NOT NULL,
                 value   INTEGER NOT NULL CHECK (value >= 0)
             )
         END-STATEMENT
+        say $query;
+        $!dbh.do($query);
 
         $!dbh.do(qq:to/END-STATEMENT/);
-            INSERT INTO "$!migration-table-name"
+            INSERT INTO $!migration-table-name
                 VALUES ('current-version', 0)
         END-STATEMENT
         self!debug("set initial version to 0");
